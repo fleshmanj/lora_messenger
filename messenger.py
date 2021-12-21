@@ -48,7 +48,6 @@ class Messenger(object):
         self.lcd.clear()
         state = self.state
         print(state)
-        self.print_input_buffer()
         if state == "main_menu":
             self.print_menu(self.menus["main menu"])
         if state == "send_menu":
@@ -64,6 +63,7 @@ class Messenger(object):
 
 
 
+        self.print_input_buffer()
         self.lcd.set_cursor_pos(self.row, self.col)
         self.lcd.draw_cursor()
         print("update screen")
@@ -81,10 +81,8 @@ class Messenger(object):
     def print_input_buffer(self):
         row = 0
         col = 0
-
+        self.lcd.set_cursor_pos(row, col)
         for char in self.input_buffer:
-            self.lcd.set_cursor_pos(0, col)
-
             if col < self.lcd.width - 1:
                 self.lcd.print(char)
                 col += 1
