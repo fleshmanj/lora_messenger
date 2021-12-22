@@ -61,13 +61,9 @@ class Messenger(object):
         if state == "sender_list":
             self.print_menu(self.menus["sender list"])
 
-
-
         self.print_input_buffer()
         self.lcd.set_cursor_pos(self.row, self.col)
         self.lcd.draw_cursor()
-        print("update screen")
-
 
     def print_menu(self, strings):
         # strings = ("* Send", "* Messages", "* Settings")
@@ -77,70 +73,77 @@ class Messenger(object):
             self.lcd.print(item)
             row += 1
 
-
     def print_input_buffer(self):
-        row = 0
-        col = 0
-        self.lcd.set_cursor_pos(row, col)
-        for char in self.input_buffer:
-            if col < self.lcd.width - 1:
-                self.lcd.print(char)
-                col += 1
-                self.lcd.set_cursor_pos(row, col)
-            elif row == self.lcd.height - 2 and col == self.lcd.width - 1:
-                pass
-            else:
-                row += 1
-                col = 0
-                self.lcd.print(char)
-                self.lcd.set_cursor_pos(row, col)
+        state = self.state
+        if state == "compose_message":
+            row = 0
+            col = 0
+            self.lcd.set_cursor_pos(row, col)
+            for char in self.input_buffer:
+                if col < self.lcd.width - 1:
+                    self.lcd.print(char)
+                    col += 1
+                    self.lcd.set_cursor_pos(row, col)
+                elif row == self.lcd.height - 2 and col == self.lcd.width - 1:
+                    pass
+                else:
+                    row += 1
+                    col = 0
+                    self.lcd.print(char)
+                    self.lcd.set_cursor_pos(row, col)
+                self.row = row
+                self.col = col
+            self.lcd.set_cursor_pos(self.row, self.col)
 
-            self.row = row
-            self.col = col
-        self.lcd.set_cursor_pos(self.row, self.col)
-
-
-
-
-
+        if state == "send_menu":
+            row = 0
+            col = 3
+            self.lcd.set_cursor_pos(row, col)
+            for char in self.input_buffer:
+                if col <= self.col < self.lcd.width - 1:
+                    self.lcd.print(char)
+                    col += 1
+                    self.lcd.set_cursor_pos(row, col)
+                elif row == self.lcd.height - 2 and col == self.lcd.width - 1:
+                    pass
+                else:
+                    row += 1
+                    col = 0
+                    self.lcd.print(char)
+                    self.lcd.set_cursor_pos(row, col)
+                self.row = row
+                self.col = col
+            self.lcd.set_cursor_pos(self.row, self.col)
 
     def on_up(self):
         if self.row > 0:
             self.row -= 1
             self.lcd.set_cursor_pos(self.row, self.col)
-            print("Pressing w!")
-            print(str(self.row) + ", " + str(self.col))
         self.update_screen()
 
     def on_left(self):
-        if self.col > 0:
-            self.col -= 1
-            self.lcd.set_cursor_pos(self.row, self.col)
-        self.update_screen()
+        if self.state == "send_menu":
+            if self.row > 0:
+                self.col -= 1
+                self.lcd.set_cursor_pos(self.row, self.col)
+            self.update_screen()
 
     def on_down(self):
+
         if self.row < self.lcd.height - 1:
             self.row += 1
             self.lcd.set_cursor_pos(self.row, self.col)
-            print("Pressing s!")
-            print(str(self.row) + ", " + str(self.col))
         self.update_screen()
 
     def on_right(self):
         if self.col < self.lcd.width - 1:
             self.col += 1
             self.lcd.set_cursor_pos(self.row, self.col)
-            print("Pressing d!")
-            print(str(self.row) + ", " + str(self.col))
         self.update_screen()
 
     def on_p(self):
-        print("Pressing p!")
         print(self.lcd.current_cursor_pos())
         print(self.state)
-        buffer = self.input_buffer
-
-        print(buffer)
 
     def on_enter(self):
         print("Pressing enter")
@@ -150,7 +153,7 @@ class Messenger(object):
             if self.row == 0 and self.col == 0:
                 self.send_new()
                 self.row = 0
-                self.col = 0
+                self.col = 3
             if self.row == 1 and self.col == 0:
                 self.received_menu()
                 self.row = 0
@@ -198,10 +201,6 @@ class Messenger(object):
     def write_char(self, st):
         self.input_buffer += st
         self.update_screen()
-        print(" write char")
-
-
-
 
     def print_char(self, st):
         state = self.state
@@ -240,9 +239,6 @@ class Messenger(object):
             self.input_buffer = self.input_buffer[:len(self.input_buffer)-1]
             # self.input_buffer = self.input_buffer[]
             self.col = self.col - 1
-            print("this works")
-            print(self.col)
-            print(self.row)
             self.lcd.set_cursor_pos(self.row, self.col)
             self.lcd.delete(self.col, self.row)
             self.lcd.draw_cursor()
@@ -300,6 +296,17 @@ if __name__ == '__main__':
     key.add_hotkey("b", main.write_char, args=["b"], suppress=True)
     key.add_hotkey("n", main.write_char, args=["n"], suppress=True)
     key.add_hotkey("m", main.write_char, args=["m"], suppress=True)
+    key.add_hotkey("0", main.write_char, args=["0"], suppress=True)
+    key.add_hotkey("1", main.write_char, args=["1"], suppress=True)
+    key.add_hotkey("2", main.write_char, args=["2"], suppress=True)
+    key.add_hotkey("3", main.write_char, args=["3"], suppress=True)
+    key.add_hotkey("4", main.write_char, args=["4"], suppress=True)
+    key.add_hotkey("5", main.write_char, args=["5"], suppress=True)
+    key.add_hotkey("6", main.write_char, args=["6"], suppress=True)
+    key.add_hotkey("7", main.write_char, args=["7"], suppress=True)
+    key.add_hotkey("8", main.write_char, args=["8"], suppress=True)
+    key.add_hotkey("9", main.write_char, args=["9"], suppress=True)
+
 
 
     key.wait("q+right_shift")
