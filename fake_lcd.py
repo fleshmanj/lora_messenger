@@ -19,7 +19,11 @@ class Fake_lcd(object):
     def print(self, st):
         st = st.replace("\n","")
         st = st.replace("\r","")
-        self.window.addstr(self.cursor_pos[1], self.cursor_pos[0], st)
+        if self.cursor_pos[1] < self.width-1:
+            self.window.addstr(self.cursor_pos[1], self.cursor_pos[0], st)
+        else:
+            print("string too long")
+
         self.window.refresh()
 
     def clear(self):
@@ -28,7 +32,6 @@ class Fake_lcd(object):
         self.screen.refresh()
 
     def set_cursor_pos(self, row, col):
-        curses.setsyx(row,col)
         self.cursor_pos = (col, row)
 
     def delete(self, y, x):

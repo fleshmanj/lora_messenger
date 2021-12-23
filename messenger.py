@@ -4,34 +4,58 @@ import time
 from transitions import Machine
 import fake_lcd
 import keyboard  # using module keyboard
+import fake_rylr896
 
 
 class Messenger(object):
     key = keyboard
     states = ["main_menu", "send_menu", "received_menu", "settings_menu", "set_address", "set_networkid",
-              "set_parameters", "compose_message", "sender_list"]
+              "set_parameters", "compose_message", "sender_list", "sending_message", "send_failed", "send_successful"]
 
-    def __init__(self, lcd_to_use, row=0, col=0):
+    def __init__(self, lcd_to_use, lora, row=0, col=0):
+        """
+
+        :param lcd_to_use: We are using a 2004a LCD display
+        :param lora: currently using the RYLR896 with library
+        :param row: sets the default row for the cursor
+        :param col: sets the default column for the cursor
+        """
         self.lcd = lcd_to_use
+        self.lora = lora
         self.lcd.home = (0, 0)
         self.row = row
         self.col = col
-        self.buffer = ""
+        # keeps track of the end of the input string
+        self.text_col = 0
+        # keeps track of the end of the input string
+        self.text_row = 0
+        # initializes the state of the machine
+        self.state = None
+        # dictionary of all menus to write to the screen depending on the state
         self.menus = {"main menu": ("* Send", "* Messages", "* Settings"),
-                      "send menu": ("To:", "Compose", "", "Main menu"),
-                      "received menu": ("Sender", "", "", "Main menu"),
-                      "settings menu": ("* Set addr (0-65535)", "* Set ntwk (0-16)", "", "Main menu"),
-                      "compose message": ("", "", "", "Main menu"),
-                      "sender list": ("", "", "", "Main menu")}
-
+                      "send menu": ("To:", "Compose", "", "M"),
+                      "received menu": ("Sender", "", "", "M"),
+                      "settings menu": ("* Set addr (0-65535)", "* Set ntwk (0-16)", "", "M"),
+                      "compose message": ("Send:", "", "", "M B S"),
+                      "sender list": ("", "", "", "M"),
+                      "sending message": ("Sending message", "", "", ""),
+                      "send failed": ("Send failed", "", "", ""),
+                      "send successful": ("Send successful", "", "", ""),
+                      }
+        # error message variable to use
+        self.error_message = None
+        # used to store date before being sent
+        self.data_to_send = {"address": None, "data": None}
+        # used to store last sent message
+        self.last_sent = {}
+        # buffer to store input string
         self.input_buffer = ""
         # Initialize the state machine
-
         self.machine = Machine(model=self, states=Messenger.states, initial='main_menu')
 
         # Add some transitions. We could also define these using a static list of
-        # dictionaries, as we did with states above, and then pass the list to
-        # the Machine initializer as the transitions= argument.
+        # dictionaries, and then pass the list to the Machine initializer as the
+        # transitions= argument.
 
         self.machine.add_transition(trigger='send_new', source='main_menu', dest='send_menu')
         self.machine.add_transition('back', 'send_menu', 'main_menu')
@@ -43,200 +67,570 @@ class Messenger(object):
         self.machine.add_transition('main_menu', '*', 'main_menu')
         self.machine.add_transition('compose_message', 'send_menu', 'compose_message')
         self.machine.add_transition('sender_list', 'received_menu', 'sender_list')
+        self.machine.add_transition('back', 'compose_message', 'send_menu')
+        self.machine.add_transition('sending_message', 'compose_message', 'sending_message')
+        self.machine.add_transition('send_failed', 'sending_message', 'send_failed')
+        self.machine.add_transition('send_successful', 'sending_message', 'send_successful')
 
     def update_screen(self):
+        """
+        refreshes the screen after an event
+        :return:
+        """
+        # clears the LCD
         self.lcd.clear()
-        state = self.state
-        print(state)
-        if state == "main_menu":
+        # checks the current state of the machine
+        if self.state == "main_menu":
+            # prints the menu screen
             self.print_menu(self.menus["main menu"])
-        if state == "send_menu":
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+        # checks the current state of the machine
+        if self.state == "send_menu":
             self.print_menu(self.menus["send menu"])
-        if state == "received_menu":
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+        # checks the current state of the machine
+        if self.state == "received_menu":
             self.print_menu(self.menus["received menu"])
-        if state == "settings_menu":
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+        # checks the current state of the machine
+        if self.state == "settings_menu":
             self.print_menu(self.menus["settings menu"])
-        if state == "compose_message":
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+        # checks the current state of the machine
+        if self.state == "compose_message":
             self.print_menu(self.menus["compose message"])
-        if state == "sender_list":
-            self.print_menu(self.menus["sender list"])
-
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+        # checks the current state of the machine
+        if self.state == "send_successful":
+            self.print_menu(self.menus["send successful"])
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+            # gives 3 seconds to read the screen
+            time.sleep(3)
+            # returns to main menu state
+            self.main_menu()
+            # refreshes the screen
+            self.update_screen()
+        # checks the current state of the machine
+        if self.state == "send_failed":
+            self.print_menu(self.menus["send failed"])
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+                # gives 3 seconds to read the screen
+                time.sleep(3)
+                # returns to main menu state
+                self.main_menu()
+                # refreshes the screen
+                self.update_screen()
+        # checks the current state of the machine
+        if self.state == "sending_message":
+            self.print_menu(self.menus["sending message"])
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+            # sends the data and if returns True....
+            if self.lora.send(str(self.data_to_send["data"]), self.data_to_send["address"]):
+                # saves the data as last_sent for future use
+                self.last_sent = self.data_to_send
+                # clears data_to_send for the next message
+                self.data_to_send = None
+                # transitions to the send_successful state
+                self.send_successful()
+            else:
+                # if False transitions to the send_failed state
+                self.send_failed()
+            # refreshes the screen
+            self.update_screen()
+        # prints the input buffer to the screen
         self.print_input_buffer()
+        # sets the cursor to the current row and col
         self.lcd.set_cursor_pos(self.row, self.col)
+        # draws the cursor and the cursor position
         self.lcd.draw_cursor()
 
+    # prints the menu to the screen
+    # uses a list of strings with a string on each row of the LCD
+    # example: ("* Send", "* Messages", "* Settings")
+    # best to use a dictionary of possible strings
     def print_menu(self, strings):
         # strings = ("* Send", "* Messages", "* Settings")
         row = 0
+        # loops through the strings and prints each one a row
         for item in strings:
+            # sets the cursor where to print
             self.lcd.set_cursor_pos(row, 0)
+            # prints the string
             self.lcd.print(item)
+            # increments to the next row
             row += 1
 
+    def print_error(self, error_message: str):
+        """
+        put an error message on the menu bar
+        :param error_message: the error message to use
+        :return: None
+        """
+        # raises an error when the length of the error message is more than 10
+        if len(error_message) > 10:
+            raise "Error message too long"
+        # sets the row to print
+        row = 3
+        # sets the column to print
+        col = 10
+        # loops through the characters of the string
+        for char in error_message:
+            # sets the cursor where to print
+            self.lcd.set_cursor_pos(row, col)
+            # prints the character
+            self.lcd.print(char)
+            # increments the col until it gets to the second to last cell
+            if col < 18:
+                col += 1
+            else:
+                # self explanatory
+                raise "String cannot print to bottom right cell of LCD. " \
+                      "Crashes for some reason and i am too dumb to figure " \
+                      "out why so I just don't print that far."
+        # sets the cursor back to the users cursor position
+        self.lcd.set_cursor_pos(self.row, self.col)
+
     def print_input_buffer(self):
-        state = self.state
-        if state == "compose_message":
+        """
+        Prints the input buffer to the screen based on what state the machine is in.
+        :return:
+        """
+        # checks the state of the machine
+        if self.state == "compose_message":
+            # sets the row to print on
             row = 0
-            col = 0
+            # sets the col to print on
+            col = 5
+            # sets the cursor where to print
             self.lcd.set_cursor_pos(row, col)
+            # loops through the characters in the input buffer
             for char in self.input_buffer:
+                # checks to make sure its not printing on the last column of the row
                 if col < self.lcd.width - 1:
+                    # prints the character
                     self.lcd.print(char)
+                    # increments the column
                     col += 1
+                    # moves the cursor to the next col
                     self.lcd.set_cursor_pos(row, col)
+                # checks to see if we are on the last column in line 3 and if so passes
                 elif row == self.lcd.height - 2 and col == self.lcd.width - 1:
                     pass
+                # prints to the next row
                 else:
+                    # increments to next row
                     row += 1
+                    # sets column back to zero
                     col = 0
+                    # prints the character
                     self.lcd.print(char)
+                    # moves the cursor to the next col
                     self.lcd.set_cursor_pos(row, col)
-                self.row = row
-                self.col = col
+                # saves the col of the end of the input buffer
+                self.text_col = col
+                # saves the row of the end of the input buffer
+                self.text_row = row
+            # sets the cursor back to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
-
-        if state == "send_menu":
-            row = 0
-            col = 3
-            self.lcd.set_cursor_pos(row, col)
-            for char in self.input_buffer:
-                if col <= self.col < self.lcd.width - 1:
-                    self.lcd.print(char)
-                    col += 1
-                    self.lcd.set_cursor_pos(row, col)
-                elif row == self.lcd.height - 2 and col == self.lcd.width - 1:
-                    pass
-                else:
-                    row += 1
-                    col = 0
-                    self.lcd.print(char)
-                    self.lcd.set_cursor_pos(row, col)
-                self.row = row
-                self.col = col
-            self.lcd.set_cursor_pos(self.row, self.col)
-
-    def on_up(self):
-        if self.row > 0:
-            self.row -= 1
-            self.lcd.set_cursor_pos(self.row, self.col)
-        self.update_screen()
-
-    def on_left(self):
+        # checks the state of the machine
         if self.state == "send_menu":
-            if self.row > 0:
-                self.col -= 1
-                self.lcd.set_cursor_pos(self.row, self.col)
-            self.update_screen()
-
-    def on_down(self):
-
-        if self.row < self.lcd.height - 1:
-            self.row += 1
+            # sets the row to print on
+            row = 0
+            # sets the col to print on
+            col = 3
+            # sets the cursor where to print
+            self.lcd.set_cursor_pos(row, col)
+            # loops through the characters in the input buffer
+            for char in self.input_buffer:
+                # checks to make sure its not printing on the last column of the row
+                if col <= self.lcd.width - 1:
+                    # prints the character
+                    self.lcd.print(char)
+                    # increments the column
+                    col += 1
+                    # moves the cursor to the next col
+                    self.lcd.set_cursor_pos(row, col)
+                # checks to see if we are on the last column in line 3 and if so passes
+                elif row == self.lcd.height - 3 and col == self.lcd.width - 1:
+                    pass
+                # passes on every row except the first
+                elif row < self.lcd.height - 3:
+                    pass
+                # saves the col of the end of the input buffer
+                self.text_row = row
+                # saves the row of the end of the input buffer
+                self.text_col = col
+            # sets the cursor back to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
-        self.update_screen()
-
-    def on_right(self):
-        if self.col < self.lcd.width - 1:
-            self.col += 1
-            self.lcd.set_cursor_pos(self.row, self.col)
-        self.update_screen()
-
-    def on_p(self):
-        print(self.lcd.current_cursor_pos())
-        print(self.state)
-
-    def on_enter(self):
-        print("Pressing enter")
-        state = self.state
-
-        if state == "main_menu":
-            if self.row == 0 and self.col == 0:
-                self.send_new()
-                self.row = 0
-                self.col = 3
-            if self.row == 1 and self.col == 0:
-                self.received_menu()
-                self.row = 0
-                self.col = 0
-            if self.row == 2 and self.col == 0:
-                self.settings_menu()
-                self.row = 0
-                self.col = 0
-        elif state == "send_menu":
-            if self.row == 1 and self.col == 0:
-                self.compose_message()
-                self.row = 0
-                self.col = 0
-            if self.row == 3 and self.col == 0:
-                self.main_menu()
-                self.row = 0
-                self.col = 0
-        elif state == "compose_message":
-            if self.row == 3 and self.col == 0:
-                self.main_menu()
-                self.row = 0
-                self.col = 0
-        elif state == "received_menu":
-            if self.row == 0 and self.col == 0:
-                self.sender_list()
-                self.row = 0
-                self.col = 0
-            if self.row == 3 and self.col == 0:
-                self.main_menu()
-                self.row = 0
-                self.col = 0
-        elif state == "sender_list":
-            if self.row == 3 and self.col == 0:
-                self.main_menu()
-                self.row = 0
-                self.col = 0
-        elif state == "settings_menu":
-            if self.row == 3 and self.col == 0:
-                self.main_menu()
-                self.row = 0
-                self.col = 0
-
-        self.update_screen()
-
-    def write_char(self, st):
-        self.input_buffer += st
-        self.update_screen()
-
-    def print_char(self, st):
-        state = self.state
-        if state == "compose_message":
-            if self.col < self.lcd.width - 1:
-                self.lcd.print(st)
-                self.col += 1
-                self.lcd.set_cursor_pos(self.row, self.col)
-            elif self.row == self.lcd.height - 2 and self.col == self.lcd.width - 1:
-                pass
-            else:
-                self.row = self.row + 1
-                self.col = 0
-                self.lcd.print(st)
-                self.lcd.set_cursor_pos(self.row, self.col)
-
-        elif state == "send_message":
-            if self.col < self.lcd.width - 1:
-                self.lcd.print(st)
-                self.col = self.col + 1
-                self.lcd.set_cursor_pos(self.row, self.col)
-            elif self.row == self.lcd.height - 2 and self.col == self.lcd.width - 1:
-                pass
-            else:
-                self.row = self.row + 1
-                self.col = 0
-                self.lcd.set_cursor_pos(self.row, self.col)
         else:
             pass
 
+    def on_up(self):
+        """
+        Moves the cursor up
+        :return:
+        """
+        # checks to make sure cursor is not on the last row
+        if self.row > 0:
+            # increments the row
+            self.row -= 1
+            # moves the cursor to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+        else:
+            pass
+        # refreshes the screen
+        self.update_screen()
+
+    def on_left(self):
+        """
+        Moves the cursor left
+        :return:
+        """
+        # checks if the cursor is on the last column
+        if self.col > 0:
+            # decrements the column
+            self.col -= 1
+            # moves the cursor to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+        else:
+            pass
+        # refreshes the screen
+        self.update_screen()
+
+    def on_down(self):
+        """
+        Moves the cursor down
+        :return:
+        """
+        # checks to make sure the cursor is not on the bottom row
+        if self.row < self.lcd.height - 1:
+            # increments the row
+            self.row += 1
+            # moves the cursor to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+        else:
+            pass
+        self.update_screen()
+
+    def on_right(self):
+        """
+        Moves the cursor right
+        :return:
+        """
+        # checks to make sure the cursor is not on the last column
+        if self.col < self.lcd.width - 1:
+            # increments the column
+            self.col += 1
+            # moves the cursor to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+        else:
+            pass
+        # refreshes the screen
+        self.update_screen()
+
+    def on_p(self):
+        """
+        Used for testing purposes
+        """
+        print(self.lcd.current_cursor_pos())
+        print(self.state)
+        print(self.input_buffer)
+        print(self.data_to_send)
+        pass
+
+    def on_enter(self):
+        """
+        Excutes the transitions from state to state
+        :return:
+        """
+        # checks the current state
+        if self.state == "main_menu":
+            # checks if the the cursor is at 0,0
+            if self.row == 0 and self.col == 0:
+                # transitions to the send_new state
+                self.send_new()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 3
+            # checks if the the cursor is at 1,0
+            if self.row == 1 and self.col == 0:
+                # transitions to the received_menu state
+                self.received_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+            # checks if the the cursor is at 2,0
+            if self.row == 2 and self.col == 0:
+                # transitions to the received_menu state
+                self.settings_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+            else:
+                pass
+        # checks the current state
+        elif self.state == "send_menu":
+            # checks if the the cursor is at 1,0
+            if self.row == 1 and self.col == 0:
+                # checks if the input buffer is empty and if so passes
+                if self.input_buffer != "":
+                    # transitions to the compose_menu state
+                    self.compose_message()
+                    # resets the starting position for the cursor
+                    self.row = 0
+                    # resets the starting position for the cursor
+                    self.col = 5
+                    # sets the data_to_send address
+                    self.data_to_send["address"] = self.input_buffer
+                    # clears the input buffer
+                    self.input_buffer = ""
+                pass
+            # checks if the the cursor is at 3,0
+            elif self.row == 3 and self.col == 0:
+                # transitions to the main_menu state
+                self.main_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            else:
+                pass
+        # checks the current state
+        elif self.state == "compose_message":
+            # checks if the the cursor is at 3,0
+            if self.row == 3 and self.col == 0:
+                # transitions to the main_menu state
+                self.main_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            # checks if the the cursor is at 3,2
+            elif self.row == 3 and self.col == 2:
+                # transitions to the send_menu state
+                self.send_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            # checks if the the cursor is at 3,4
+            elif self.row == 3 and self.col == 4:
+                # transitions to the sending_message state
+                self.sending_message()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # checks to make sure there is data to send
+                if self.input_buffer is not None:
+                    self.data_to_send["data"] = self.input_buffer
+                # clears the input buffer
+                self.input_buffer = ""
+            else:
+                pass
+        # checks the current state
+        elif self.state == "received_menu":
+            # checks if the the cursor is at 0,0
+            if self.row == 0 and self.col == 0:
+                # transitions to the sender_list state
+                self.sender_list()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+            # checks if the the cursor is at 3,0
+            if self.row == 3 and self.col == 0:
+                # transitions to the main_menu state
+                self.main_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            else:
+                pass
+        # checks the current state
+        elif self.state == "sender_list":
+            # checks if the the cursor is at 3,0
+            if self.row == 3 and self.col == 0:
+                # transitions to the main_menu state
+                self.main_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            else:
+                pass
+        # checks the current state
+        elif self.state == "settings_menu":
+            # checks if the the cursor is at 3,0
+            if self.row == 3 and self.col == 0:
+                # transitions to the main_menu state
+                self.main_menu()
+                # resets the starting position for the cursor
+                self.row = 0
+                # resets the starting position for the cursor
+                self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            else:
+                pass
+        # refreshes the screen
+        self.update_screen()
+
+    def write_char(self, st):
+        """
+        Writes the input from the user into the input buffer
+        :param st: string to write to the input buffer
+        :return:
+        """
+        # checks the current state
+        if self.state == "send_menu":
+            # verifies the input is valid and if not gives an error for the user to view
+            if self.__is_address_field_valid(st):
+                # clears the error message if input is valid
+                self.error_message = None
+                # if the users cursor is beyond the end of the text string it will set the
+                # cursor to the end of the string
+                if self.col > self.text_col and self.row > self.text_row:
+                    # sets the users cursor column to the end of the input buffer text
+                    self.col = self.text_col
+                    # sets the users cursor row to the end of the input buffer text
+                    self.row = self.text_row
+                # sets the cursor to the current row and col
+                self.lcd.set_cursor_pos(self.row, self.col)
+                # locates the beginning of the input buffer string
+                string_num = self.col + (self.row * self.lcd.width) - 3
+                # only allows a string of 5 characters
+                if len(self.input_buffer) < 5:
+                    # adds a character at the position of the cursor
+                    self.input_buffer = self.input_buffer[:string_num] + st + self.input_buffer[string_num:]
+                # checks to make sure sure cursor is not on last column of the row
+                if self.col < self.lcd.width - 1:
+                    # increments the column
+                    self.col += 1
+                    # sets the cursor to the current row and col
+                    self.lcd.set_cursor_pos(self.row, self.col)
+                # Does not allow writing to the input buffer past the 1st line
+                elif self.row == self.lcd.height - 3 and self.col == self.lcd.width - 1:
+                    pass
+                else:
+                    # increments the row
+                    self.row += 1
+                    # sets the col back to zero to wrap the text
+                    self.col = 0
+            # sets the error
+            else:
+                self.error_message = "0-65535"
+            # checks to make sure the number entered is within the range 0-65535
+            if self.__is_address_field_valid(self.input_buffer):
+                # clears the error_message
+                self.error_message = None
+            else:
+                # sets the the error_message
+                self.error_message = "0-65535"
+            # sets the cursor back to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+        # checks the current state
+        if self.state == "compose_message":
+            #
+            if self.col > self.text_col and self.row > self.text_row:
+                self.col = self.text_col
+                self.row = self.text_row
+
+            self.lcd.set_cursor_pos(self.row, self.col)
+            string_num = self.col + (self.row * self.lcd.width) - 5
+            self.input_buffer = self.input_buffer[:string_num] + st + self.input_buffer[string_num:]
+            if self.col < self.lcd.width - 1:
+                self.col += 1
+                self.lcd.set_cursor_pos(self.row, self.col)
+            elif self.row == self.lcd.height - 3 and self.col == self.lcd.width - 1:
+                pass
+            else:
+                self.row += 1
+                self.col = 0
+            self.lcd.set_cursor_pos(self.row, self.col)
+
+        self.update_screen()
+
+    # currently not used
+    # def print_char(self, st):
+    #     state = self.state
+    #     if state == "compose_message":
+    #         if self.col < self.lcd.width - 1:
+    #             self.lcd.print(st)
+    #             self.col += 1
+    #             self.lcd.set_cursor_pos(self.row, self.col)
+    #         elif self.row == self.lcd.height - 2 and self.col == self.lcd.width - 1:
+    #             pass
+    #         else:
+    #             self.row = self.row + 1
+    #             self.col = 0
+    #             self.lcd.print(st)
+    #             self.lcd.set_cursor_pos(self.row, self.col)
+    #
+    #     elif state == "send_message":
+    #         if self.col < self.lcd.width - 1:
+    #             self.lcd.print(st)
+    #             self.col = self.col + 1
+    #             self.lcd.set_cursor_pos(self.row, self.col)
+    #         elif self.row == self.lcd.height - 2 and self.col == self.lcd.width - 1:
+    #             pass
+    #         else:
+    #             self.row = self.row + 1
+    #             self.col = 0
+    #             self.lcd.set_cursor_pos(self.row, self.col)
+    #     else:
+    #         pass
+
 
     def delete(self):
+        if self.state == "send_menu":
+            start_of_string = -3
+        if self.state == "compose_message":
+            start_of_string = -5
+        else:
+            start_of_string = 0
         if self.col > 0:
             self.lcd.delete(self.col, self.row)
-            delete_chr = " "
-            self.input_buffer = self.input_buffer[:len(self.input_buffer)-1]
+            string_num = self.col + (self.row * self.lcd.width) + start_of_string
+            self.input_buffer = self.input_buffer[:string_num - 1] + self.input_buffer[string_num:]
             # self.input_buffer = self.input_buffer[]
             self.col = self.col - 1
             self.lcd.set_cursor_pos(self.row, self.col)
@@ -253,11 +647,25 @@ class Messenger(object):
             self.lcd.delete(self.col, self.row)
             self.lcd.print(chr(9608))
 
+    def __is_address_field_valid(self, test_input):
+        try:
+            data = int(test_input)
+        except:
+            return False
+        if data < 0:
+            return False
+        if data > 65535:
+            return False
+        return True
+
 
 if __name__ == '__main__':
     key = keyboard
+    txpin = "GP4"
+    rxpin = "GP5"
+    lora = fake_rylr896.RYLR896(name="lora", rx=rxpin, tx=txpin, timeout=1, debug=True)
     flcd = fake_lcd.Fake_lcd()
-    main = Messenger(flcd)
+    main = Messenger(flcd, lora)
 
     main.update_screen()
     flcd.set_cursor_pos(0, 0)
@@ -270,7 +678,7 @@ if __name__ == '__main__':
     key.add_hotkey("enter", main.on_enter)
     key.add_hotkey("space", main.write_char, args=[" "], suppress=True)
     key.add_hotkey("backspace", main.delete)
-    key.add_hotkey("q", main.print_char, args=["q"], suppress=True)
+    key.add_hotkey("q", main.write_char, args=["q"], suppress=True)
     key.add_hotkey("w", main.write_char, args=["w"], suppress=True)
     key.add_hotkey("e", main.write_char, args=["e"], suppress=True)
     key.add_hotkey("r", main.write_char, args=["r"], suppress=True)
