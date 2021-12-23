@@ -44,7 +44,7 @@ class Messenger(object):
         # error message variable to use
         self.error_message = None
         # used to store date before being sent
-        self.data_to_send = {"address": None, "data": None}
+        self.data_to_send = {}
         # used to store last sent message
         self.last_sent = {}
         # buffer to store input string
@@ -407,7 +407,7 @@ class Messenger(object):
                     # resets the starting position for the cursor
                     self.col = 5
                     # sets the data_to_send address
-                    self.data_to_send["address"] = self.input_buffer
+                    self.data_to_send["address"] = int(self.input_buffer)
                     # clears the input buffer
                     self.input_buffer = ""
                 pass
@@ -455,7 +455,7 @@ class Messenger(object):
                 self.col = 0
                 # checks to make sure there is data to send
                 if self.input_buffer is not None:
-                    self.data_to_send["data"] = self.input_buffer
+                    self.data_to_send["data"] = str(self.input_buffer)
                 # clears the input buffer
                 self.input_buffer = ""
             else:
