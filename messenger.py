@@ -91,6 +91,7 @@ class Messenger(object):
                 self.print_error(self.error_message)
         # checks the current state of the machine
         if self.state == "send_menu":
+            # prints the send menu screen
             self.print_menu(self.menus["send menu"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -98,6 +99,7 @@ class Messenger(object):
                 self.print_error(self.error_message)
         # checks the current state of the machine
         if self.state == "received_menu":
+            # prints the received menu screen
             self.print_menu(self.menus["received menu"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -105,6 +107,7 @@ class Messenger(object):
                 self.print_error(self.error_message)
         # checks the current state of the machine
         if self.state == "settings_menu":
+            # prints the settings menu screen
             self.print_menu(self.menus["settings menu"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -112,6 +115,7 @@ class Messenger(object):
                 self.print_error(self.error_message)
         # checks the current state of the machine
         if self.state == "setting_address":
+            # prints the setting address screen
             self.print_menu(self.menus["setting address"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -119,6 +123,7 @@ class Messenger(object):
                 self.print_error(self.error_message)
         # checks the current state of the machine
         if self.state == "compose_message":
+            # prints the compose message screen
             self.print_menu(self.menus["compose message"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -126,6 +131,7 @@ class Messenger(object):
                 self.print_error(self.error_message)
         # checks the current state of the machine
         if self.state == "send_successful":
+            # prints the send successful screen
             self.print_menu(self.menus["send successful"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -139,6 +145,7 @@ class Messenger(object):
             self.update_screen()
         # checks the current state of the machine
         if self.state == "send_failed":
+            # prints the send failed screen
             self.print_menu(self.menus["send failed"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -152,6 +159,7 @@ class Messenger(object):
                 self.update_screen()
         # checks the current state of the machine
         if self.state == "sending_message":
+            # prints the sending message screen
             self.print_menu(self.menus["sending message"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
@@ -283,7 +291,7 @@ class Messenger(object):
                     col += 1
                     # moves the cursor to the next col
                     self.lcd.set_cursor_pos(row, col)
-                # checks to see if we are on the last column in line 3 and if so passes
+                # checks to see if we are on the last column in line 1 and if so passes
                 elif row == self.lcd.height - 3 and col == self.lcd.width - 1:
                     pass
                 # passes on every row except the first
