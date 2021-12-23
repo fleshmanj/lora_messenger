@@ -14,7 +14,6 @@ class Messenger(object):
 
     def __init__(self, lcd_to_use, lora, row=0, col=0):
         """
-
         :param lcd_to_use: We are using a 2004a LCD display
         :param lora: currently using the RYLR896 with library
         :param row: sets the default row for the cursor
@@ -547,7 +546,7 @@ class Messenger(object):
                     self.col += 1
                     # sets the cursor to the current row and col
                     self.lcd.set_cursor_pos(self.row, self.col)
-                # Does not allow writing to the input buffer past the 1st line
+                # Does not allow writing to the input buffer past the 3rd line
                 elif self.row == self.lcd.height - 3 and self.col == self.lcd.width - 1:
                     pass
                 else:
@@ -569,24 +568,36 @@ class Messenger(object):
             self.lcd.set_cursor_pos(self.row, self.col)
         # checks the current state
         if self.state == "compose_message":
-            #
+            # if the users cursor is beyond the end of the text string it will set the
+            # cursor to the end of the string
             if self.col > self.text_col and self.row > self.text_row:
+                # sets the users cursor column to the end of the input buffer text
                 self.col = self.text_col
+                # sets the users cursor row to the end of the input buffer text
                 self.row = self.text_row
-
+            # sets the cursor to the current row and col
             self.lcd.set_cursor_pos(self.row, self.col)
+            # locates the beginning of the input buffer string
             string_num = self.col + (self.row * self.lcd.width) - 5
+            # adds a character at the position of the cursor
             self.input_buffer = self.input_buffer[:string_num] + st + self.input_buffer[string_num:]
+            # checks to make sure sure cursor is not on last column of the row
             if self.col < self.lcd.width - 1:
+                # increments the column
                 self.col += 1
+                # sets the cursor to the current row and col
                 self.lcd.set_cursor_pos(self.row, self.col)
+                # Does not allow writing to the input buffer past the 3rd line
             elif self.row == self.lcd.height - 3 and self.col == self.lcd.width - 1:
                 pass
             else:
+                # increments the row
                 self.row += 1
+                # sets the col back to zero to wrap the text
                 self.col = 0
+            # sets the cursor back to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
-
+        # refreshes the screen
         self.update_screen()
 
     # currently not used
@@ -621,33 +632,54 @@ class Messenger(object):
 
 
     def delete(self):
+        # checks the current state
         if self.state == "send_menu":
+            # sets the start of the string on the first line
             start_of_string = -3
+        # checks the current state
         if self.state == "compose_message":
+            # sets the start of the string on the first line
             start_of_string = -5
         else:
+            # sets the start of the string on first column and row
             start_of_string = 0
+        # only allows delete if there is space
         if self.col > 0:
-            self.lcd.delete(self.col, self.row)
+            # locates the beginning of the input buffer string
             string_num = self.col + (self.row * self.lcd.width) + start_of_string
+            # removes the character from the input string at the location the left of the cursor
             self.input_buffer = self.input_buffer[:string_num - 1] + self.input_buffer[string_num:]
-            # self.input_buffer = self.input_buffer[]
+            # decrements the cursor column
             self.col = self.col - 1
+            # moves the cursor to the users cursor
             self.lcd.set_cursor_pos(self.row, self.col)
+            # clears the cursor from the screen
             self.lcd.delete(self.col, self.row)
+            # redraws the cursor
             self.lcd.draw_cursor()
-
+        # only allows delete in the screen
         elif self.row == self.lcd.height - self.lcd.height and self.col == self.lcd.width - self.lcd.width:
             pass
         else:
+            # deletes the cell
             self.lcd.delete(self.col, self.row)
+            # sets the cursor column to the far right cell
             self.col = self.lcd.width - 1
+            # sets the cursor row one up
             self.row = self.row - 1
+            # moves the cursor to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
+            # deletes the cursor
             self.lcd.delete(self.col, self.row)
+            # redraws the cursor
             self.lcd.print(chr(9608))
 
     def __is_address_field_valid(self, test_input):
+        """
+        Currently only works for send data screen.
+        :param test_input: string to verify if it is a valid input.
+        :return:
+        """
         try:
             data = int(test_input)
         except:
