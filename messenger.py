@@ -76,6 +76,18 @@ class Messenger(object):
         self.machine.add_transition('setting_address', 'settings_menu', 'setting_address')
         self.machine.add_transition('setting_networkid', 'settings_menu', 'setting_networkid')
 
+        self.listening = True
+        self.running = True
+        self.last_received = {
+                            "address": None,
+                            "length": None,
+                            "data": None,
+                            "rssi": None,
+                            "snr": None,
+                            "time": None,
+                            "hash": None
+                            }
+
     def update_screen(self):
         """
         refreshes the screen after an event
@@ -169,6 +181,7 @@ class Messenger(object):
                 self.update_screen()
         # checks the current state of the machine
         if self.state == "sending_message":
+            self.listening = False
             # prints the sending message screen
             self.print_menu(self.menus["sending message"])
             # if there is an error it will display it on the bottom line
@@ -179,15 +192,14 @@ class Messenger(object):
             if self.lora.send(str(self.data_to_send["data"]), self.data_to_send["address"]):
                 # saves the data as last_sent for future use
                 self.last_sent = self.data_to_send
-                # clears data_to_send for the next message
-                self.data_to_send = None
                 # transitions to the send_successful state
                 self.send_successful()
+                # clears data_to_send for the next message
                 self.data_to_send = {}
+                self.listening = True
             else:
                 # if False transitions to the send_failed state
-                self.send_failed()
-                self.data_to_send = {}
+                self.sending_message()
             # refreshes the screen
             self.update_screen()
         # prints the input buffer to the screen
@@ -456,6 +468,7 @@ class Messenger(object):
         print(self.state)
         print(self.input_buffer)
         print(self.data_to_send)
+        print(self.last_received)
         pass
 
     def on_enter(self):
@@ -966,6 +979,8 @@ class Messenger(object):
             return False
         return True
 
+    def stop(self):
+        self.running = False
 
 if __name__ == '__main__':
     key = keyboard
@@ -978,6 +993,7 @@ if __name__ == '__main__':
     main.update_screen()
     flcd.set_cursor_pos(0, 0)
 
+    key.add_hotkey("q+right_shift", main.stop)
     key.add_hotkey("w+right_shift", main.on_up)
     key.add_hotkey("a+right_shift", main.on_left)
     key.add_hotkey("s+right_shift", main.on_down)
@@ -1023,4 +1039,7 @@ if __name__ == '__main__':
     key.add_hotkey("8", main.write_char, args=["8"], suppress=True)
     key.add_hotkey("9", main.write_char, args=["9"], suppress=True)
 
-    key.wait("q+right_shift")
+    while main.listening or main.running:
+        main.last_received = lora.read_from_device()
+        if main.running != True:
+            break

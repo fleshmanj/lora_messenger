@@ -1,5 +1,6 @@
 import curses
 
+
 class Fake_lcd(object):
     screen_buffer = None
     width = None
@@ -15,6 +16,7 @@ class Fake_lcd(object):
         self.window = curses.newwin(height, width, 0, 0)
         self.cursor_pos = (0, 0)
         self.cursor_vis = curses.curs_set(1)
+        curses.noecho()
 
     def print(self, st):
         st = st.replace("\n","")
