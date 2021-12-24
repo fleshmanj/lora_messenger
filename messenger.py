@@ -11,7 +11,7 @@ class Messenger(object):
     key = keyboard
     states = ["main_menu", "send_menu", "received_menu", "settings_menu", "set_address", "set_networkid",
               "set_parameters", "compose_message", "sender_list", "sending_message", "send_failed", "send_successful",
-              "setting_address"]
+              "setting_address", "setting_networkid"]
 
     def __init__(self, lcd_to_use, lora, row=0, col=0):
         """
@@ -41,7 +41,8 @@ class Messenger(object):
                       "sending message": ("Sending message", "", "", ""),
                       "send failed": ("Send failed", "", "", ""),
                       "send successful": ("Send successful", "", "", ""),
-                      "setting address": ("Set addr (0-65535)","","enter","M")
+                      "setting address": ("Set addr (0-65535)", "", "enter", "M"),
+                      "setting networkid": ("* Set ntwk (0-16)", "", "enter", "M"),
                       }
         # error message variable to use
         self.error_message = None
@@ -73,6 +74,7 @@ class Messenger(object):
         self.machine.add_transition('send_failed', 'sending_message', 'send_failed')
         self.machine.add_transition('send_successful', 'sending_message', 'send_successful')
         self.machine.add_transition('setting_address', 'settings_menu', 'setting_address')
+        self.machine.add_transition('setting_networkid', 'settings_menu', 'setting_networkid')
 
     def update_screen(self):
         """
@@ -117,6 +119,14 @@ class Messenger(object):
         if self.state == "setting_address":
             # prints the setting address screen
             self.print_menu(self.menus["setting address"])
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+        # checks the current state of the machine
+        if self.state == "setting_networkid":
+            # prints the setting network screen
+            self.print_menu(self.menus["setting networkid"])
             # if there is an error it will display it on the bottom line
             if self.error_message is not None:
                 # prints the error message
@@ -173,9 +183,11 @@ class Messenger(object):
                 self.data_to_send = None
                 # transitions to the send_successful state
                 self.send_successful()
+                self.data_to_send = {}
             else:
                 # if False transitions to the send_failed state
                 self.send_failed()
+                self.data_to_send = {}
             # refreshes the screen
             self.update_screen()
         # prints the input buffer to the screen
@@ -333,6 +345,43 @@ class Messenger(object):
                 self.text_col = col
             # sets the cursor back to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
+        # checks the state of the machine
+        if self.state == "setting_networkid":
+            # sets the row to print on
+            row = 1
+            # sets the col to print on
+            col = 0
+            # sets the cursor where to print
+            self.lcd.set_cursor_pos(row, col)
+            # loops through the characters in the input buffer
+            for char in self.input_buffer:
+                # checks to make sure its not printing on the last column of the row
+                if col < self.lcd.width - 1:
+                    # prints the character
+                    self.lcd.print(char)
+                    # increments the column
+                    col += 1
+                    # moves the cursor to the next col
+                    self.lcd.set_cursor_pos(row, col)
+                # checks to see if we are on the last column in line 3 and if so passes
+                elif row == self.lcd.height - 2 and col == self.lcd.width - 1:
+                    pass
+                # prints to the next row
+                else:
+                    # increments to next row
+                    row += 1
+                    # sets column back to zero
+                    col = 0
+                    # prints the character
+                    self.lcd.print(char)
+                    # moves the cursor to the next col
+                    self.lcd.set_cursor_pos(row, col)
+                # saves the col of the end of the input buffer
+                self.text_col = col
+                # saves the row of the end of the input buffer
+                self.text_row = row
+            # sets the cursor back to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
         else:
             pass
 
@@ -414,46 +463,47 @@ class Messenger(object):
         Excutes the transitions from state to state
         :return:
         """
+        state = self.state
         # checks the current state
-        if self.state == "main_menu":
+        if state == "main_menu":
             # checks if the the cursor is at 0,0
             if self.row == 0 and self.col == 0:
                 # transitions to the send_new state
                 self.send_new()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 3
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 3
             # checks if the the cursor is at 1,0
             if self.row == 1 and self.col == 0:
                 # transitions to the received_menu state
                 self.received_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
             # checks if the the cursor is at 2,0
             if self.row == 2 and self.col == 0:
                 # transitions to the received_menu state
                 self.settings_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
             else:
                 pass
         # checks the current state
-        elif self.state == "send_menu":
+        elif state == "send_menu":
             # checks if the the cursor is at 1,0
             if self.row == 1 and self.col <= 7:
                 # checks if the input buffer is empty and if so passes
                 if self.input_buffer != "":
                     # transitions to the compose_menu state
                     self.compose_message()
-                    # resets the starting position for the cursor
-                    self.row = 0
-                    # resets the starting position for the cursor
-                    self.col = 5
+                    # # resets the starting position for the cursor
+                    # self.row = 0
+                    # # resets the starting position for the cursor
+                    # self.col = 5
                     # sets the data_to_send address
                     self.data_to_send["address"] = int(self.input_buffer)
                     # clears the input buffer
@@ -463,44 +513,44 @@ class Messenger(object):
             elif self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
                 pass
         # checks the current state
-        elif self.state == "compose_message":
+        elif state == "compose_message":
             # checks if the the cursor is at 3,0
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,2
             elif self.row == 3 and self.col == 2:
                 # transitions to the send_menu state
                 self.send_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,4
             elif self.row == 0 and self.col <= 5:
                 # transitions to the sending_message state
                 self.sending_message()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
                 # checks to make sure there is data to send
                 if self.input_buffer is not None:
                     self.data_to_send["data"] = str(self.input_buffer)
@@ -509,51 +559,90 @@ class Messenger(object):
             else:
                 pass
         # checks the current state
-        elif self.state == "received_menu":
+        elif state == "received_menu":
             # checks if the the cursor is at 0,0
             if self.row == 0 and self.col == 0:
                 # transitions to the sender_list state
                 self.sender_list()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
             # checks if the the cursor is at 3,0
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
                 pass
         # checks the current state
-        elif self.state == "sender_list":
+        elif state == "sender_list":
             # checks if the the cursor is at 3,0
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
                 pass
         # checks the current state
-        elif self.state == "settings_menu":
-            # checks if the the cursor is at 3,0
+        elif state == "settings_menu":
+            # checks if the the cursor is at 0,0
             if self.row == 0 and self.col == 0:
                 # transitions to the setting_address state
                 self.setting_address()
-                # resets the starting position for the cursor
-                self.row = 1
-                # resets the starting position for the cursor
-                self.col = 0
+                # # resets the starting position for the cursor
+                # self.row = 1
+                # # resets the starting position for the cursor
+                # self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+
+            # # checks if the the cursor is at 1,0
+            if self.row == 1 and self.col == 0:
+                # transitions to the setting_address state
+                self.setting_networkid()
+                # # resets the starting position for the cursor
+                # self.row = 1
+                # # resets the starting position for the cursor
+                # self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            # checks if the the cursor is at 3,0
+            if self.row == 3 and self.col == 0:
+                # transitions to the main_menu state
+                self.main_menu()
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            else:
+                pass
+        # checks the current state of the machine
+        elif state == "setting_address":
+            # checks if the the cursor is at between 2,0 and 2,4
+            if self.row == 2 and self.col <= 5:
+                # transitions to the main_menu state
+                self.main_menu()
+                # # resets the starting position for the cursor
+                # self.row = 0
+                # # resets the starting position for the cursor
+                # self.col = 0
+                # saves the address to the data_to_send
+                self.data_to_send["address_to_use"] = int(self.input_buffer)
+                print(lora.set_address(self.data_to_send["address_to_use"]))
+                self.data_to_send = {}
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,0
@@ -569,7 +658,7 @@ class Messenger(object):
             else:
                 pass
         # checks the current state of the machine
-        elif self.state == "setting_address":
+        elif state == "setting_networkid":
             # checks if the the cursor is at between 2,0 and 2,4
             if self.row == 2 and self.col <= 5:
                 # transitions to the main_menu state
@@ -579,8 +668,9 @@ class Messenger(object):
                 # resets the starting position for the cursor
                 self.col = 0
                 # saves the address to the data_to_send
-                self.data_to_send["address_to_use"] = int(self.input_buffer)
-                print(lora.set_address(self.data_to_send["address_to_use"]))
+                self.data_to_send["networkid_to_use"] = int(self.input_buffer)
+                print(lora.set_network_id(self.data_to_send["networkid_to_use"]))
+                self.data_to_send = {}
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,0
@@ -607,7 +697,7 @@ class Messenger(object):
         # checks the current state
         if self.state == "send_menu":
             # verifies the input is valid and if not gives an error for the user to view
-            if self.__is_address_field_valid(st):
+            if self.__is_address_field_valid(st, 65535, 0):
                 # clears the error message if input is valid
                 self.error_message = None
                 # if the users cursor is beyond the end of the text string it will set the
@@ -643,7 +733,7 @@ class Messenger(object):
             else:
                 self.error_message = "0-65535"
             # checks to make sure the number entered is within the range 0-65535
-            if self.__is_address_field_valid(self.input_buffer):
+            if self.__is_address_field_valid(self.input_buffer, 65535, 0):
                 # clears the error_message
                 self.error_message = None
             else:
@@ -685,7 +775,7 @@ class Messenger(object):
 
         # checks the current state
         if self.state == "setting_address":
-            if self.__is_address_field_valid(st):
+            if self.__is_address_field_valid(st, 65535, 0):
                 # clears the error message if input is valid
                 self.error_message = None
                 # if the users cursor is beyond the end of the text string it will set the
@@ -720,13 +810,60 @@ class Messenger(object):
             # sets the error
             else:
                 self.error_message = "0-65535"
-                # checks to make sure the number entered is within the range 0-65535
-            if self.__is_address_field_valid(self.input_buffer):
+            # checks to make sure the number entered is within the range 0-65535
+            if self.__is_address_field_valid(self.input_buffer, 65535, 0):
                 # clears the error_message
                 self.error_message = None
             else:
                 # sets the the error_message
                 self.error_message = "0-65535"
+            # sets the cursor back to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+
+        # checks the current state
+        if self.state == "setting_networkid":
+            if self.__is_address_field_valid(st, 16, 0):
+                # clears the error message if input is valid
+                self.error_message = None
+                # if the users cursor is beyond the end of the text string it will set the
+                # cursor to the end of the string
+                if self.col > self.text_col and self.row > self.text_row:
+                    # sets the users cursor column to the end of the input buffer text
+                    self.col = self.text_col
+                    # sets the users cursor row to the end of the input buffer text
+                    self.row = self.text_row
+                # sets the cursor to the current row and col
+                self.lcd.set_cursor_pos(self.row, self.col)
+                # locates the beginning of the input buffer string
+                string_num = self.col + (self.row * self.lcd.width)
+                # only allows a string with length of 5
+                if len(self.input_buffer) < 5:
+                    # adds a character at the position of the cursor
+                    self.input_buffer = self.input_buffer[:string_num] + st + self.input_buffer[string_num:]
+                # checks to make sure sure cursor is not on last column of the row
+                if self.col < self.lcd.width - 1:
+                    # increments the column
+                    self.col += 1
+                    # sets the cursor to the current row and col
+                    self.lcd.set_cursor_pos(self.row, self.col)
+                    # Does not allow writing to the input buffer past the 3rd line
+                elif self.row == self.lcd.height - 1 and self.col == self.lcd.width - 1:
+                    pass
+                else:
+                    # increments the row
+                    self.row += 1
+                    # sets the col back to zero to wrap the text
+                    self.col = 0
+            # sets the error
+            else:
+                self.error_message = "0-16"
+                # checks to make sure the number entered is within the range 0-16
+            if self.__is_address_field_valid(self.input_buffer, 16, 0):
+                # clears the error_message
+                self.error_message = None
+            else:
+                # sets the the error_message
+                self.error_message = "0-16"
             # sets the cursor back to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
         # refreshes the screen
@@ -762,17 +899,19 @@ class Messenger(object):
     #     else:
     #         pass
 
-
     def delete(self):
         # checks the current state
         if self.state == "send_menu":
             # sets the start of the string on the first line
             start_of_string = -3
         # checks the current state
-        if self.state == "compose_message":
+        elif self.state == "compose_message":
             # sets the start of the string on the first line
             start_of_string = -5
-        if self.state == "setting_address":
+        elif self.state == "setting_address":
+            # sets the start of the string on the first line
+            start_of_string = -20
+        elif self.state == "setting_networkid":
             # sets the start of the string on the first line
             start_of_string = -20
         else:
@@ -780,6 +919,8 @@ class Messenger(object):
             start_of_string = 0
         # only allows delete if there is space
         if self.col > 0:
+            # clears the cursor from the screen
+            self.lcd.delete(self.col, self.row)
             # locates the beginning of the input buffer string
             string_num = self.col + (self.row * self.lcd.width) + start_of_string
             # removes the character from the input string at the location the left of the cursor
@@ -809,7 +950,7 @@ class Messenger(object):
             # redraws the cursor
             self.lcd.print(chr(9608))
 
-    def __is_address_field_valid(self, test_input):
+    def __is_address_field_valid(self, test_input, high, low):
         """
         Currently only works for send data screen.
         :param test_input: string to verify if it is a valid input.
@@ -819,9 +960,9 @@ class Messenger(object):
             data = int(test_input)
         except:
             return False
-        if data < 0:
+        if data < int(low):
             return False
-        if data > 65535:
+        if data > int(high):
             return False
         return True
 
@@ -881,7 +1022,5 @@ if __name__ == '__main__':
     key.add_hotkey("7", main.write_char, args=["7"], suppress=True)
     key.add_hotkey("8", main.write_char, args=["8"], suppress=True)
     key.add_hotkey("9", main.write_char, args=["9"], suppress=True)
-
-
 
     key.wait("q+right_shift")
