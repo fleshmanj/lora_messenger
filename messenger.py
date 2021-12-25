@@ -37,7 +37,7 @@ class Messenger(object):
                       "received menu": ("Messages", "", "", "M"),
                       "settings menu": ("* Set addr (0-65535)", "* Set ntwk (0-16)", "", "M"),
                       "compose message": ("Send:", "", "", "M B"),
-                      "sender list": ("", "", "", "M N L"),
+                      "sender list": ("", "", "", "M N L D"),
                       "sending message": ("Sending message", "", "", ""),
                       "send failed": ("Send failed", "", "", ""),
                       "send successful": ("Send successful", "", "", ""),
@@ -223,7 +223,8 @@ class Messenger(object):
             # refreshes the screen
             self.update_screen()
         # prints the input buffer to the screen
-        self.print_input_buffer()
+        if self.input_buffer != "":
+            self.print_input_buffer()
         # sets the cursor to the current row and col
         self.lcd.set_cursor_pos(self.row, self.col)
         # draws the cursor and the cursor position
@@ -246,7 +247,10 @@ class Messenger(object):
             row += 1
 
     def print_message(self):
-        string_to_print = "Sender = " + str(self.messages[self.current_message]["address"]) + " " +"     Data = "+ str(self.messages[self.current_message]["data"])
+        space = " "
+        length_of_address = len(str(self.messages[self.current_message]["address"]))
+        space = space * (11 - length_of_address)
+        string_to_print = "Sender = " + str(self.messages[self.current_message]["address"]) + space +"Data = "+ str(self.messages[self.current_message]["data"])
         self.scroll(string_to_print, self.sheet)
 
 
@@ -545,26 +549,14 @@ class Messenger(object):
             if self.row == 0 and self.col == 0:
                 # transitions to the send_new state
                 self.send_new()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 3
             # checks if the the cursor is at 1,0
             if self.row == 1 and self.col == 0:
                 # transitions to the received_menu state
                 self.received_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
             # checks if the the cursor is at 2,0
             if self.row == 2 and self.col == 0:
                 # transitions to the received_menu state
                 self.settings_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
             else:
                 pass
         # checks the current state
@@ -575,10 +567,6 @@ class Messenger(object):
                 if self.input_buffer != "":
                     # transitions to the compose_menu state
                     self.compose_message()
-                    # # resets the starting position for the cursor
-                    # self.row = 0
-                    # # resets the starting position for the cursor
-                    # self.col = 5
                     # sets the data_to_send address
                     self.data_to_send["address"] = int(self.input_buffer)
                     # clears the input buffer
@@ -588,10 +576,6 @@ class Messenger(object):
             elif self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
@@ -602,30 +586,19 @@ class Messenger(object):
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,2
             elif self.row == 3 and self.col == 2:
                 # transitions to the send_menu state
                 self.send_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,4
             elif self.row == 0 and self.col <= 5:
                 # transitions to the sending_message state
                 self.sending_message()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
+
                 # checks to make sure there is data to send
                 if self.input_buffer is not None:
                     self.data_to_send["data"] = str(self.input_buffer)
@@ -639,20 +612,13 @@ class Messenger(object):
             if self.row == 0 and self.col == 0:
                 # transitions to the sender_list state
                 self.sender_list()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
+                # resets to last received message
                 self.current_message = -1
             # checks if the the cursor is at 3,0
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
-                # clears the input buffer
+
                 self.input_buffer = ""
             else:
                 pass
@@ -662,21 +628,31 @@ class Messenger(object):
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,2
             if self.row == 3 and self.col == 2:
                 # goes to next message
                 self.current_message += 1
+                # resets view window
+                self.sheet = 0
+                # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,4
             if self.row == 3 and self.col == 4:
                 # goes to last message
                 self.current_message -= 1
+                # resets view window
+                self.sheet = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            # checks if the the cursor is at 3,6
+            if self.row == 3 and self.col == 6:
+                # goes to last message
+                self.messages.pop(self.current_message)
+                print("deleting message")
+                # resets view window
+                self.sheet = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
@@ -687,10 +663,6 @@ class Messenger(object):
             if self.row == 0 and self.col == 0:
                 # transitions to the setting_address state
                 self.setting_address()
-                # # resets the starting position for the cursor
-                # self.row = 1
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
 
@@ -698,20 +670,12 @@ class Messenger(object):
             if self.row == 1 and self.col == 0:
                 # transitions to the setting_address state
                 self.setting_networkid()
-                # # resets the starting position for the cursor
-                # self.row = 1
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             # checks if the the cursor is at 3,0
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
@@ -722,10 +686,6 @@ class Messenger(object):
             if self.row == 2 and self.col <= 5:
                 # transitions to the main_menu state
                 self.main_menu()
-                # # resets the starting position for the cursor
-                # self.row = 0
-                # # resets the starting position for the cursor
-                # self.col = 0
                 # saves the address to the data_to_send
                 self.data_to_send["address_to_use"] = int(self.input_buffer)
                 print(lora.set_address(self.data_to_send["address_to_use"]))
@@ -736,10 +696,6 @@ class Messenger(object):
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
@@ -750,10 +706,6 @@ class Messenger(object):
             if self.row == 2 and self.col <= 5:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
                 # saves the address to the data_to_send
                 self.data_to_send["networkid_to_use"] = int(self.input_buffer)
                 print(lora.set_network_id(self.data_to_send["networkid_to_use"]))
@@ -764,10 +716,6 @@ class Messenger(object):
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
                 self.main_menu()
-                # resets the starting position for the cursor
-                self.row = 0
-                # resets the starting position for the cursor
-                self.col = 0
                 # clears the input buffer
                 self.input_buffer = ""
             else:
@@ -1148,22 +1096,21 @@ if __name__ == '__main__':
     while True:
         main.last_received = lora.read_from_device()
         if main.last_received is not None:
-            if main.mailbox_full is not True:
-                if True:
-                # if main.last_received["address"] in main.contacts.values():
-                    current_time = int(time.time())
-                    key_to_lookup = main.last_received["address"]
-
-                    main.messages.append(main.last_received)
+            if not main.mailbox_full:
+                print("adding mail")
+                main.messages.append(main.last_received)
 
                 # elif main.last_received["address"] in main.messages.keys():
                 #     current_time = int(time.time())
                 #     main.messages[main.last_received["address"]].append(main.last_received)
                 main.message_count += 1
-            else:
-                pass
-        if main.message_count == 40:
-            main.mailbox_full = True
+                if main.message_count > 39:
+                    print("closing mailbox")
+                    main.mailbox_full = True
+        if main.mailbox_full:
+            if len(main.messages) < 40:
+                main.mailbox_full = False
+                print("opening mailbox")
 
         if not main.running:
             break
