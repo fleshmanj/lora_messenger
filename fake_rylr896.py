@@ -95,7 +95,7 @@ class RYLR896:
         "hash":self.msg_hash
         }
         """
-        msg = self.__generate_fake_msg(random.randint(4, 200))
+        msg = self.__generate_fake_msg(random.randint(4, 60))
         address, payload_length, data, rssi, snr = (
         random.randint(1, 65535), len(msg), msg, random.randint(-100, -1), random.randint(20, 70))
         msg = ReceivedMessage(address=address, payload_length=payload_length, actual_data=data,

@@ -34,10 +34,10 @@ class Messenger(object):
         # dictionary of all menus to write to the screen depending on the state
         self.menus = {"main menu": ("* Send", "* Messages", "* Settings"),
                       "send menu": ("To:", "Compose", "", "M"),
-                      "received menu": ("Sender", "", "", "M"),
+                      "received menu": ("Messages", "", "", "M"),
                       "settings menu": ("* Set addr (0-65535)", "* Set ntwk (0-16)", "", "M"),
                       "compose message": ("Send:", "", "", "M B"),
-                      "sender list": ("", "", "", "M"),
+                      "sender list": ("", "", "", "M N L"),
                       "sending message": ("Sending message", "", "", ""),
                       "send failed": ("Send failed", "", "", ""),
                       "send successful": ("Send successful", "", "", ""),
@@ -87,6 +87,17 @@ class Messenger(object):
                             "time": None,
                             "hash": None
                             }
+        # self.last_received = {'address': 65523, 'length': 24, 'data': 'r`l_qgnlai__ojscpflejacf', 'rssi': -5, 'snr': 42,
+        #  'time': 1640356965.7930956,
+        #  'hash': b'7\x81\xc1;\x15s\xed\xbf\x04\x11p\xd92nW"B\x85V\x89\x08\xc5\xac*l\x8f\x15U\xc4\xcacf'}
+        self.messages = [
+                         ]
+        self.contacts = {"josh": 2}
+        self.mailbox_full = False
+        self.message_count = 0
+        self.sheet = 0
+        self.current_message = None
+
 
     def update_screen(self):
         """
@@ -119,6 +130,15 @@ class Messenger(object):
             if self.error_message is not None:
                 # prints the error message
                 self.print_error(self.error_message)
+        if self.state == "sender_list":
+            # prints the received menu screen
+            self.print_menu(self.menus["sender list"])
+            # if there is an error it will display it on the bottom line
+            if self.error_message is not None:
+                # prints the error message
+                self.print_error(self.error_message)
+            elif self.messages is not None:
+                self.print_message()
         # checks the current state of the machine
         if self.state == "settings_menu":
             # prints the settings menu screen
@@ -224,6 +244,44 @@ class Messenger(object):
             self.lcd.print(item)
             # increments to the next row
             row += 1
+
+    def print_message(self):
+        string_to_print = "Sender = " + str(self.messages[self.current_message]["address"]) + " " +"     Data = "+ str(self.messages[self.current_message]["data"])
+        self.scroll(string_to_print, self.sheet)
+
+
+    def scroll(self, string, sheet=0, num_lines_to_show=3):
+        row = 0
+        col = 0
+        self.lcd.set_cursor_pos(row, col)
+        start = sheet * self.lcd.width
+        end = (sheet + num_lines_to_show) * self.lcd.width
+        if len(string) < num_lines_to_show * self.lcd.height:
+            for char in string:
+                self.lcd.set_cursor_pos(row, col)
+                self.lcd.print(char)
+                if col < self.lcd.width - 1:
+                    # Char was placed on current line. No need to reposition cursor.
+                    col += 1
+
+                else:
+                    # At end of line: go to left side next row. Wrap around to first row if on last row.
+                    row += 1
+                    col = 0
+
+        else:
+            for char in string[start:end]:
+                self.lcd.set_cursor_pos(row, col)
+                self.lcd.print(char)
+                if col < self.lcd.width - 1:
+                    # Char was placed on current line. No need to reposition cursor.
+                    col += 1
+                else:
+                    row += 1
+                    col = 0
+
+        self.lcd.set_cursor_pos(self.row, self.col)
+
 
     def print_error(self, error_message: str):
         """
@@ -409,6 +467,8 @@ class Messenger(object):
             # moves the cursor to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
         else:
+            if self.sheet > 0:
+                self.sheet -= 1
             pass
         # refreshes the screen
         self.update_screen()
@@ -441,6 +501,7 @@ class Messenger(object):
             # moves the cursor to the users cursor position
             self.lcd.set_cursor_pos(self.row, self.col)
         else:
+            self.sheet += 1
             pass
         self.update_screen()
 
@@ -464,11 +525,12 @@ class Messenger(object):
         """
         Used for testing purposes
         """
-        print(self.lcd.current_cursor_pos())
-        print(self.state)
-        print(self.input_buffer)
-        print(self.data_to_send)
-        print(self.last_received)
+        # print(self.lcd.current_cursor_pos())
+        # print(self.state)
+        # print(self.input_buffer)
+        # print(self.data_to_send)
+        # print(self.last_received)
+        print(self.messages)
         pass
 
     def on_enter(self):
@@ -581,6 +643,7 @@ class Messenger(object):
                 # self.row = 0
                 # # resets the starting position for the cursor
                 # self.col = 0
+                self.current_message = -1
             # checks if the the cursor is at 3,0
             if self.row == 3 and self.col == 0:
                 # transitions to the main_menu state
@@ -603,6 +666,17 @@ class Messenger(object):
                 # self.row = 0
                 # # resets the starting position for the cursor
                 # self.col = 0
+                # clears the input buffer
+                self.input_buffer = ""
+            # checks if the the cursor is at 3,2
+            if self.row == 3 and self.col == 2:
+                # goes to next message
+                self.current_message += 1
+                self.input_buffer = ""
+            # checks if the the cursor is at 3,4
+            if self.row == 3 and self.col == 4:
+                # goes to last message
+                self.current_message -= 1
                 # clears the input buffer
                 self.input_buffer = ""
             else:
@@ -767,6 +841,37 @@ class Messenger(object):
             self.lcd.set_cursor_pos(self.row, self.col)
             # locates the beginning of the input buffer string
             string_num = self.col + (self.row * self.lcd.width) - 5
+            # adds a character at the position of the cursor
+            self.input_buffer = self.input_buffer[:string_num] + st + self.input_buffer[string_num:]
+            # checks to make sure sure cursor is not on last column of the row
+            if self.col < self.lcd.width - 1:
+                # increments the column
+                self.col += 1
+                # sets the cursor to the current row and col
+                self.lcd.set_cursor_pos(self.row, self.col)
+                # Does not allow writing to the input buffer past the 3rd line
+            elif self.row == self.lcd.height - 3 and self.col == self.lcd.width - 1:
+                pass
+            else:
+                # increments the row
+                self.row += 1
+                # sets the col back to zero to wrap the text
+                self.col = 0
+            # sets the cursor back to the users cursor position
+            self.lcd.set_cursor_pos(self.row, self.col)
+
+        if self.state == "sender_list":
+            # if the users cursor is beyond the end of the text string it will set the
+            # cursor to the end of the string
+            if self.col > self.text_col and self.row > self.text_row:
+                # sets the users cursor column to the end of the input buffer text
+                self.col = self.text_col
+                # sets the users cursor row to the end of the input buffer text
+                self.row = self.text_row
+            # sets the cursor to the current row and col
+            self.lcd.set_cursor_pos(self.row, self.col)
+            # locates the beginning of the input buffer string
+            string_num = self.col + (self.row * self.lcd.width)
             # adds a character at the position of the cursor
             self.input_buffer = self.input_buffer[:string_num] + st + self.input_buffer[string_num:]
             # checks to make sure sure cursor is not on last column of the row
@@ -990,6 +1095,7 @@ if __name__ == '__main__':
     flcd = fake_lcd.Fake_lcd()
     main = Messenger(flcd, lora)
 
+
     main.update_screen()
     flcd.set_cursor_pos(0, 0)
 
@@ -1039,7 +1145,25 @@ if __name__ == '__main__':
     key.add_hotkey("8", main.write_char, args=["8"], suppress=True)
     key.add_hotkey("9", main.write_char, args=["9"], suppress=True)
 
-    while main.listening or main.running:
+    while True:
         main.last_received = lora.read_from_device()
-        if main.running != True:
+        if main.last_received is not None:
+            if main.mailbox_full is not True:
+                if True:
+                # if main.last_received["address"] in main.contacts.values():
+                    current_time = int(time.time())
+                    key_to_lookup = main.last_received["address"]
+
+                    main.messages.append(main.last_received)
+
+                # elif main.last_received["address"] in main.messages.keys():
+                #     current_time = int(time.time())
+                #     main.messages[main.last_received["address"]].append(main.last_received)
+                main.message_count += 1
+            else:
+                pass
+        if main.message_count == 40:
+            main.mailbox_full = True
+
+        if not main.running:
             break
